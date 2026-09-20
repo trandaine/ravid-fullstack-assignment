@@ -1,0 +1,481 @@
+openapi: 3.0.3
+info:
+  title: RAVID Fullstack RAG Chatbot API
+  version: 1.0.0
+  description: |
+    Retrieval-Augmented Generation (RAG) document chatbot backend. Authenticated users upload
+    documents (.pdf, .txt, .md), which are asynchronously parsed, chunked, embedded, and indexed
+    into a per-user isolated vector collection. Users can query their knowledge base via standard
+    RAG or advanced HyDE (Hypothetical Document Embeddings) retrieval.
+servers:
+  - url: http://localhost:8000
+    description: Local Docker Compose Environment
+paths:
+  /api/register/:
+    post:
+      summary: Register a new user account
+      description: Create a new user account with email and password.
+      operationId: auth_register_create
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterSuccessResponse'
+        '400':
+          description: Validation error or duplicate email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/login/:
+    post:
+      summary: User login
+      description: Authenticate user credentials and issue a JWT access token. Also supports HTTP Basic Auth.
+      operationId: auth_login_create
+      tags:
+        - Authentication
+      security:
+        - basicAuth: []
+        - {}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful. Returns JWT access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginSuccessResponse'
+        '401':
+          description: Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/auth/me/:
+    get:
+      summary: Current user profile
+      description: Return the authenticated user's ID and email.
+      operationId: auth_me_retrieve
+      tags:
+        - Authentication
+      security:
+        - jwtAuth: []
+        - basicAuth: []
+      responses:
+        '200':
+          description: Authenticated user details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Missing or invalid authentication token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/documents/upload/:
+    post:
+      summary: Upload a private document
+      description: |
+        Upload a .pdf, .txt, or .md file (max 10 MB). Stores the file, creates a Document and
+        IngestionJob record, and dispatches an asynchronous background task to chunk, embed,
+        and index the content into the user's isolated Chroma collection.
+      operationId: documents_upload_create
+      tags:
+        - Documents
+      security:
+        - jwtAuth: []
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentUploadRequest'
+      responses:
+        '202':
+          description: File accepted and background ingestion queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentUploadSuccessResponse'
+        '400':
+          description: Invalid file type or file size exceeds 10 MB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/documents/:
+    get:
+      summary: List user documents
+      description: Return all documents owned by the authenticated user.
+      operationId: documents_list
+      tags:
+        - Documents
+      security:
+        - jwtAuth: []
+        - basicAuth: []
+      responses:
+        '200':
+          description: List of documents owned by the caller.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentItem'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/documents/{id}/:
+    delete:
+      summary: Delete a document
+      description: Delete an uploaded document and its vector embeddings in Chroma.
+      operationId: documents_delete
+      tags:
+        - Documents
+      security:
+        - jwtAuth: []
+        - basicAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID of the document to delete
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Document deleted successfully.
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Document not found or owned by another user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/documents/status/:
+    get:
+      summary: Poll ingestion task status
+      description: Retrieve the real-time status of an asynchronous document ingestion task.
+      operationId: documents_status_retrieve
+      tags:
+        - Documents
+      security:
+        - jwtAuth: []
+        - basicAuth: []
+      parameters:
+        - name: task_id
+          in: query
+          required: true
+          description: Celery task UUID returned from the upload endpoint
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Current ingestion task state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionStatusResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Task ID not found or not owned by caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/chat/query/:
+    post:
+      summary: Submit RAG / HyDE chat query
+      description: |
+        Ask a question against the user's private knowledge base. Retrieves context from
+        the user's isolated Chroma collection (`user_{user_id}`) and synthesizes an answer via
+        OpenRouter LLM. Optionally supports advanced HyDE (Hypothetical Document Embeddings) retrieval
+        and multi-turn conversational history.
+      operationId: chat_query_create
+      tags:
+        - Chat
+      security:
+        - jwtAuth: []
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatQueryRequest'
+      responses:
+        '200':
+          description: Grounded answer from the knowledge base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatQuerySuccessResponse'
+        '400':
+          description: Missing query parameter or invalid payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+components:
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter the JWT token returned by POST /api/login/
+    basicAuth:
+      type: http
+      scheme: basic
+      description: HTTP Basic Authentication using registered email and password
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePassw0rd!
+
+    RegisterSuccessResponse:
+      type: object
+      required:
+        - message
+        - user_id
+      properties:
+        message:
+          type: string
+          example: User registered successfully
+        user_id:
+          type: integer
+          example: 1
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePassw0rd!
+
+    LoginSuccessResponse:
+      type: object
+      required:
+        - message
+        - token
+      properties:
+        message:
+          type: string
+          example: Login successful
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    MeResponse:
+      type: object
+      required:
+        - user_id
+        - email
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          example: user@example.com
+
+    DocumentUploadRequest:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Uploaded file (.pdf, .txt, .md, max 10 MB)
+
+    DocumentUploadSuccessResponse:
+      type: object
+      required:
+        - message
+        - document_id
+        - task_id
+      properties:
+        message:
+          type: string
+          example: Document uploaded and ingestion started
+        document_id:
+          type: integer
+          example: 42
+        task_id:
+          type: string
+          format: uuid
+          example: c9bf9e57-1685-4c89-bafb-ff5af830be8a
+
+    DocumentItem:
+      type: object
+      required:
+        - id
+        - original_name
+        - content_type
+        - size_bytes
+        - uploaded_at
+      properties:
+        id:
+          type: integer
+          example: 42
+        original_name:
+          type: string
+          example: quarterly_report.pdf
+        content_type:
+          type: string
+          example: application/pdf
+        size_bytes:
+          type: integer
+          example: 204850
+        uploaded_at:
+          type: string
+          format: date-time
+          example: 2026-09-20T10:00:00Z
+
+    IngestionStatusResponse:
+      type: object
+      required:
+        - task_id
+        - status
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          example: c9bf9e57-1685-4c89-bafb-ff5af830be8a
+        status:
+          type: string
+          enum: [PROCESSING, SUCCESS, FAILURE]
+          example: SUCCESS
+        message:
+          type: string
+          example: Document successfully parsed, embedded, and indexed in vector storage.
+        error:
+          type: string
+          example: Failed to parse document content.
+
+    ChatMessageHistory:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system]
+          example: user
+        content:
+          type: string
+          example: What was the revenue for Q3?
+
+    ChatQueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          example: What are the main findings in the document?
+        use_hyde:
+          type: boolean
+          default: false
+          description: Toggle advanced Hypothetical Document Embeddings (HyDE) retrieval mode
+          example: true
+        message_histories:
+          type: array
+          description: Optional list of previous chat turns for conversation context
+          items:
+            $ref: '#/components/schemas/ChatMessageHistory'
+
+    ChatQuerySuccessResponse:
+      type: object
+      required:
+        - answer
+      properties:
+        answer:
+          type: string
+          example: Based on your uploaded documents, the total revenue increased by 14% in Q3.
+
+    ErrorEnvelope:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: Invalid file format. Only PDF, TXT, and Markdown files are allowed.
