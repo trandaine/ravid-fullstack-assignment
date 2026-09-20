@@ -24,5 +24,6 @@ CHROMA_PERSIST_DIR = tempfile.mkdtemp(prefix="ravid_test_chroma_")
 
 RAVID_EMBEDDINGS_STUB = True
 EMBEDDING_MODEL = "stub"
+RAVID_LLM_STUB = True
 
 LOGGING["root"]["level"] = "WARNING"  # noqa: F405

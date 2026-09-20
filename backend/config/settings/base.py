@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "apps.common.apps.CommonConfig",
     "apps.documents.apps.DocumentsConfig",
     "apps.rag.apps.RagConfig",
+    "apps.chat.apps.ChatConfig",
 ]
 
 MIDDLEWARE = [
@@ -132,6 +133,13 @@ EMBEDDING_MODEL = env("EMBEDDING_MODEL", default="sentence-transformers/all-Mini
 # Chunking config
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
+
+# OpenRouter / LLM
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+OPENROUTER_BASE_URL = env("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
+OPENROUTER_MODEL = env("OPENROUTER_MODEL", default="google/gemma-2-9b-it:free")
+OPENROUTER_TIMEOUT = env_int("OPENROUTER_TIMEOUT", default=30)
+RAVID_LLM_STUB = env_bool("RAVID_LLM_STUB", default=False)
 
 LOGGING = {
     "version": 1,
