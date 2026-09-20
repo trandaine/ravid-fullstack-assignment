@@ -1,5 +1,11 @@
-"""URL routes for rag app."""
+"""URL routing for RAG app."""
 
 from django.urls import path
 
-urlpatterns = []
+from .views import IngestionStatusView
+
+app_name = "rag"
+
+urlpatterns = [
+    path("status/", IngestionStatusView.as_view(), name="ingestion-status"),
+]
