@@ -7,9 +7,9 @@ from apps.common.env import env, env_bool, env_int, env_list
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-key-change-in-production")
-DEBUG = env_bool("DEBUG", default=False)
-ALLOWED_HOSTS: list[str] = env_list("ALLOWED_HOSTS", default="localhost,127.0.0.1")
+SECRET_KEY = env("SECRET_KEY", default=env("DJANGO_SECRET_KEY", default="django-insecure-dev-key-change-in-production"))
+DEBUG = env_bool("DEBUG", default=env_bool("DJANGO_DEBUG", default=False))
+ALLOWED_HOSTS: list[str] = env_list("ALLOWED_HOSTS", default=env("DJANGO_ALLOWED_HOSTS", default="localhost,127.0.0.1,0.0.0.0,10.0.2.2"))
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -124,6 +124,8 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 
 # Chroma vector storage
+CHROMA_HOST = env("CHROMA_HOST", default=None)
+CHROMA_PORT = env_int("CHROMA_PORT", default=8000)
 CHROMA_PERSIST_DIR = env("CHROMA_PERSIST_DIR", default=str(BASE_DIR / "chroma_data"))
 EMBEDDING_MODEL = env("EMBEDDING_MODEL", default="sentence-transformers/all-MiniLM-L6-v2")
 

@@ -19,6 +19,7 @@ CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
 MEDIA_ROOT = tempfile.mkdtemp(prefix="ravid_test_media_")
+CHROMA_HOST = None
 CHROMA_PERSIST_DIR = tempfile.mkdtemp(prefix="ravid_test_chroma_")
 
 RAVID_EMBEDDINGS_STUB = True
