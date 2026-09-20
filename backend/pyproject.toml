@@ -1,0 +1,37 @@
+# pyproject.toml — RAVID backend
+
+[build-system]
+requires = ["setuptools>=82.0.1", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ravid-backend"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.0,<5.3",
+    "djangorestframework",
+    "djangorestframework-simplejwt",
+    "drf-spectacular",
+    "celery[redis]",
+    "redis",
+    "psycopg2-binary",
+    "python-json-logger",
+    "langchain",
+    "langchain-community",
+    "langchain-huggingface",
+    "langchain-text-splitters",
+    "sentence-transformers",
+    "chromadb",
+    "pypdf",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*", "config*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py", "*_test.py"]
+testpaths = ["tests"]
+pythonpath = ["."]

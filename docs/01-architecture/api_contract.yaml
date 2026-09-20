@@ -31,6 +31,13 @@ paths:
       responses:
         '201':
           description: User registered successfully.
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -38,14 +45,44 @@ paths:
         '400':
           description: Validation error or duplicate email.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/login/:
     post:
       summary: User login
-      description: Authenticate user credentials and issue a JWT access token. Also supports HTTP Basic Auth.
+      description: Authenticate user credentials and issue a JWT access token. Also supports HTTP Basic Auth for mobile credential exchange.
       operationId: auth_login_create
       tags:
         - Authentication
@@ -61,16 +98,62 @@ paths:
       responses:
         '200':
           description: Login successful. Returns JWT access token.
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginSuccessResponse'
+        '400':
+          description: Invalid payload or missing credentials.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
         '401':
           description: Invalid email or password.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/auth/me/:
     get:
@@ -85,6 +168,13 @@ paths:
       responses:
         '200':
           description: Authenticated user details.
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -92,9 +182,39 @@ paths:
         '401':
           description: Missing or invalid authentication token.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/documents/upload/:
     post:
@@ -102,52 +222,127 @@ paths:
       description: |
         Upload a .pdf, .txt, or .md file (max 10 MB). Stores the file, creates a Document and
         IngestionJob record, and dispatches an asynchronous background task to chunk, embed,
-        and index the content into the user's isolated Chroma collection.
+        and index the content into the user's isolated Chroma collection. Requires JWT authentication.
       operationId: documents_upload_create
       tags:
         - Documents
       security:
         - jwtAuth: []
-        - basicAuth: []
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/DocumentUploadRequest'
+            encoding:
+              file:
+                contentType: application/pdf, text/plain, text/markdown
       responses:
         '202':
           description: File accepted and background ingestion queued.
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentUploadSuccessResponse'
         '400':
-          description: Invalid file type or file size exceeds 10 MB.
+          description: Bad Request (missing file field or invalid form parameters).
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
         '401':
-          description: Unauthorized.
+          description: Missing or invalid JWT authentication token.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          description: Forbidden (user inactive or unauthorized).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '413':
+          description: Payload Too Large (file size exceeds 10 MB limit).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '415':
+          description: Unsupported Media Type (only PDF, TXT, and Markdown files are allowed).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests (rate limit exceeded).
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/documents/:
     get:
       summary: List user documents
-      description: Return all documents owned by the authenticated user.
+      description: Return all documents owned by the authenticated user. Requires JWT authentication.
       operationId: documents_list
       tags:
         - Documents
       security:
         - jwtAuth: []
-        - basicAuth: []
       responses:
         '200':
           description: List of documents owned by the caller.
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -155,55 +350,134 @@ paths:
                 items:
                   $ref: '#/components/schemas/DocumentItem'
         '401':
-          description: Unauthorized.
+          description: Missing or invalid JWT authentication token.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/documents/{id}/:
     delete:
       summary: Delete a document
-      description: Delete an uploaded document and its vector embeddings in Chroma.
+      description: Delete an uploaded document and its vector embeddings in Chroma. Requires JWT authentication.
       operationId: documents_delete
       tags:
         - Documents
       security:
         - jwtAuth: []
-        - basicAuth: []
       parameters:
         - name: id
           in: path
           required: true
-          description: ID of the document to delete
+          description: UUID of the document to delete
           schema:
-            type: integer
+            type: string
+            format: uuid
+            example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
       responses:
         '204':
           description: Document deleted successfully.
-        '401':
-          description: Unauthorized.
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+        '400':
+          description: Invalid document UUID format.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Missing or invalid JWT authentication token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
         '404':
           description: Document not found or owned by another user.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/documents/status/:
     get:
       summary: Poll ingestion task status
-      description: Retrieve the real-time status of an asynchronous document ingestion task.
+      description: Retrieve the real-time status of an asynchronous document ingestion task. Requires JWT authentication.
       operationId: documents_status_retrieve
       tags:
         - Documents
       security:
         - jwtAuth: []
-        - basicAuth: []
       parameters:
         - name: task_id
           in: query
@@ -212,25 +486,77 @@ paths:
           schema:
             type: string
             format: uuid
+            example: c9bf9e57-1685-4c89-bafb-ff5af830be8a
       responses:
         '200':
           description: Current ingestion task state.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/IngestionStatusResponse'
-        '401':
-          description: Unauthorized.
+        '400':
+          description: Missing or invalid task_id query parameter.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Missing or invalid JWT authentication token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
         '404':
           description: Task ID not found or not owned by caller.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
   /api/chat/query/:
     post:
@@ -255,6 +581,13 @@ paths:
       responses:
         '200':
           description: Grounded answer from the knowledge base.
+          headers:
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
           content:
             application/json:
               schema:
@@ -262,15 +595,48 @@ paths:
         '400':
           description: Missing query parameter or invalid payload.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
         '401':
-          description: Unauthorized.
+          description: Missing or invalid authentication credentials.
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          description: Too Many Requests.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+            RateLimit-Limit:
+              $ref: '#/components/headers/RateLimit-Limit'
+            RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimit-Remaining'
+            RateLimit-Reset:
+              $ref: '#/components/headers/RateLimit-Reset'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal Server Error.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
 
 components:
   securitySchemes:
@@ -283,6 +649,28 @@ components:
       type: http
       scheme: basic
       description: HTTP Basic Authentication using registered email and password
+
+  headers:
+    Retry-After:
+      description: Recommended wait interval in seconds before the next polling request.
+      schema:
+        type: integer
+        example: 3
+    RateLimit-Limit:
+      description: The maximum number of allowed requests in the current rate limit window.
+      schema:
+        type: integer
+        example: 100
+    RateLimit-Remaining:
+      description: The number of remaining requests allowed in the current rate limit window.
+      schema:
+        type: integer
+        example: 95
+    RateLimit-Reset:
+      description: The number of seconds remaining until the rate limit window resets.
+      schema:
+        type: integer
+        example: 60
 
   schemas:
     RegisterRequest:
@@ -375,8 +763,9 @@ components:
           type: string
           example: Document uploaded and ingestion started
         document_id:
-          type: integer
-          example: 42
+          type: string
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
         task_id:
           type: string
           format: uuid
@@ -392,8 +781,9 @@ components:
         - uploaded_at
       properties:
         id:
-          type: integer
-          example: 42
+          type: string
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
         original_name:
           type: string
           example: quarterly_report.pdf
@@ -410,6 +800,19 @@ components:
 
     IngestionStatusResponse:
       type: object
+      oneOf:
+        - $ref: '#/components/schemas/IngestionStatusProcessingResponse'
+        - $ref: '#/components/schemas/IngestionStatusSuccessResponse'
+        - $ref: '#/components/schemas/IngestionStatusFailureResponse'
+      discriminator:
+        propertyName: status
+        mapping:
+          PROCESSING: '#/components/schemas/IngestionStatusProcessingResponse'
+          SUCCESS: '#/components/schemas/IngestionStatusSuccessResponse'
+          FAILURE: '#/components/schemas/IngestionStatusFailureResponse'
+
+    IngestionStatusProcessingResponse:
+      type: object
       required:
         - task_id
         - status
@@ -420,11 +823,43 @@ components:
           example: c9bf9e57-1685-4c89-bafb-ff5af830be8a
         status:
           type: string
-          enum: [PROCESSING, SUCCESS, FAILURE]
+          enum: [PROCESSING]
+          example: PROCESSING
+
+    IngestionStatusSuccessResponse:
+      type: object
+      required:
+        - task_id
+        - status
+        - message
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          example: c9bf9e57-1685-4c89-bafb-ff5af830be8a
+        status:
+          type: string
+          enum: [SUCCESS]
           example: SUCCESS
         message:
           type: string
           example: Document successfully parsed, embedded, and indexed in vector storage.
+
+    IngestionStatusFailureResponse:
+      type: object
+      required:
+        - task_id
+        - status
+        - error
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          example: c9bf9e57-1685-4c89-bafb-ff5af830be8a
+        status:
+          type: string
+          enum: [FAILURE]
+          example: FAILURE
         error:
           type: string
           example: Failed to parse document content.
@@ -471,11 +906,50 @@ components:
           type: string
           example: Based on your uploaded documents, the total revenue increased by 14% in Q3.
 
-    ErrorEnvelope:
+    ProblemDetails:
       type: object
       required:
-        - error
+        - type
+        - title
+        - status
+        - detail
       properties:
-        error:
+        type:
           type: string
+          format: uri
+          description: A URI reference that identifies the problem type.
+          example: https://api.ravid.cloud/errors/invalid-file-format
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type.
+          example: Unsupported Media Type
+        status:
+          type: integer
+          description: The HTTP status code generated by the origin server for this occurrence of the problem.
+          example: 415
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence of the problem.
           example: Invalid file format. Only PDF, TXT, and Markdown files are allowed.
+        instance:
+          type: string
+          description: A URI reference that identifies the specific occurrence of the problem.
+          example: /api/documents/upload/
+        invalid_params:
+          type: array
+          description: Detailed validation error breakdowns for specific input parameters.
+          items:
+            type: object
+            required:
+              - name
+              - reason
+            properties:
+              name:
+                type: string
+                example: file
+              reason:
+                type: string
+                example: Unsupported extension .xlsx. Allowed extensions are .pdf, .txt, .md.
+
+    ErrorEnvelope:
+      $ref: '#/components/schemas/ProblemDetails'
