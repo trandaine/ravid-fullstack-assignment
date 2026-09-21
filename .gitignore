@@ -12,6 +12,7 @@ env/
 ENV/
 
 r_a_v_i_d_assessment_document.md
+MobileIntergrationReviewReport.md
 # Test / coverage
 .pytest_cache/
 .mypy_cache/
