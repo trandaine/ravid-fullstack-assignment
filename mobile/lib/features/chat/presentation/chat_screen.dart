@@ -92,20 +92,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 ErrorBanner(
                   message: state.error,
                   onRetry: () {
-                    final lastFailed = state.messages.lastWhere(
-                      (m) => m.status == MessageStatus.failed,
-                      orElse: () => const Message(
-                        id: '',
-                        content: '',
-                        role: MessageRole.user,
-                        status: MessageStatus.delivered,
-                        timestamp: null as dynamic,
-                      ),
-                    );
-                    if (lastFailed.id.isNotEmpty) {
+                    final failedMessages = state.messages.where((m) => m.status == MessageStatus.failed);
+                    if (failedMessages.isNotEmpty) {
                       context
                           .read<ChatBloc>()
-                          .add(RetryMessage(messageId: lastFailed.id));
+                          .add(RetryMessage(messageId: failedMessages.last.id));
                     }
                   },
                 ),

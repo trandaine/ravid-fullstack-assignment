@@ -4,7 +4,10 @@ import '../storage/secure_storage.dart';
 import 'auth_interceptor.dart';
 
 Dio createDio({
-  required String baseUrl,
+  String baseUrl = const String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8000',
+  ),
   required SecureStorageService storage,
   required StreamController<void> unauthenticatedStream,
   String refreshEndpoint = '/api/token/refresh/',

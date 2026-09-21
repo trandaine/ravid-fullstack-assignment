@@ -15,6 +15,12 @@ class MockChatBloc extends Mock implements ChatBloc {}
 void main() {
   late MockChatBloc mockChatBloc;
 
+  setUpAll(() {
+    registerFallbackValue(const SendMessage(text: ''));
+    registerFallbackValue(const ToggleHyde(enabled: false));
+    registerFallbackValue(const ChatReset());
+  });
+
   setUp(() {
     mockChatBloc = MockChatBloc();
   });

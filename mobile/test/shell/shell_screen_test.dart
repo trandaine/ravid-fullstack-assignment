@@ -8,6 +8,7 @@ import 'package:mobile/features/auth/bloc/auth_state.dart';
 import 'package:mobile/features/chat/bloc/chat_bloc.dart';
 import 'package:mobile/features/chat/bloc/chat_state.dart';
 import 'package:mobile/features/documents/bloc/document_bloc.dart';
+import 'package:mobile/features/documents/bloc/document_event.dart';
 import 'package:mobile/features/documents/bloc/document_state.dart';
 import 'package:mobile/features/shell/presentation/shell_screen.dart';
 
@@ -19,6 +20,11 @@ void main() {
   late MockAuthBloc mockAuthBloc;
   late MockDocumentBloc mockDocumentBloc;
   late MockChatBloc mockChatBloc;
+
+  setUpAll(() {
+    registerFallbackValue(const LoadDocuments());
+    registerFallbackValue(const LogoutRequested());
+  });
 
   setUp(() {
     mockAuthBloc = MockAuthBloc();

@@ -75,15 +75,17 @@ class _ShellScreenState extends State<ShellScreen> {
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
+              padding: const EdgeInsets.all(12),
               decoration: const BoxDecoration(
                 color: Color(0xFF2563EB),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.smart_toy, size: 40, color: Colors.white),
-                  SizedBox(height: 8),
+                  Icon(Icons.smart_toy, size: 36, color: Colors.white),
+                  SizedBox(height: 6),
                   Text(
                     'R.A.V.I.D. Mobile',
                     style: TextStyle(

@@ -16,6 +16,11 @@ void main() {
   late MockDio mockRefreshDio;
   late AuthQueuedInterceptor interceptor;
 
+  setUpAll(() {
+    registerFallbackValue(RequestOptions(path: ''));
+    registerFallbackValue(Response<dynamic>(requestOptions: RequestOptions(path: '')));
+  });
+
   setUp(() {
     mockStorage = MockSecureStorageService();
     unauthenticatedStream = StreamController<void>.broadcast();

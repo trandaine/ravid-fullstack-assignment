@@ -16,6 +16,11 @@ class MockDocumentBloc extends Mock implements DocumentBloc {}
 void main() {
   late MockDocumentBloc mockDocumentBloc;
 
+  setUpAll(() {
+    registerFallbackValue(const LoadDocuments());
+    registerFallbackValue(const DeleteDocument(documentId: 1));
+  });
+
   setUp(() {
     mockDocumentBloc = MockDocumentBloc();
   });
@@ -110,7 +115,8 @@ void main() {
       final deleteButtons = find.byIcon(Icons.delete_outline);
       expect(deleteButtons, findsNWidgets(2));
       await tester.tap(deleteButtons.first);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Dialog assertions
       expect(find.text('Delete Document'), findsOneWidget);
@@ -120,7 +126,8 @@ void main() {
 
       // Tap Delete in dialog
       await tester.tap(find.text('Delete'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       verify(() => mockDocumentBloc.add(const DeleteDocument(documentId: 1))).called(1);
     });

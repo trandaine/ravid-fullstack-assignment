@@ -1,0 +1,10 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.lock
+.idea/
+*.iml
+.DS_Store
