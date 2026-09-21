@@ -1,203 +1,283 @@
 # RAVID — Fullstack RAG Document Chatbot (Backend + Mobile)
 
-![Python](https://img.shields.io/badge/python-3.12-blue)
-![Django](https://img.shields.io/badge/Django-5.x-092E20)
-![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B)
-![Celery](https://img.shields.io/badge/Celery-5.x-green)
-![Chroma](https://img.shields.io/badge/Chroma-latest-red)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-
-RAVID is a fullstack Retrieval-Augmented Generation (RAG) document chatbot platform composed of a Django REST Framework backend and a cross-platform Flutter mobile client. Authenticated users upload private documents (`.pdf`, `.txt`, `.md`), which are asynchronously parsed, chunked, embedded, and indexed into isolated per-user vector namespaces. Users can query their personal knowledge base through a mobile chat interface powered by standard RAG or advanced **HyDE** (Hypothetical Document Embeddings) retrieval.
+RAVID is a fullstack Retrieval-Augmented Generation (RAG) document chatbot platform featuring a Dockerized Django REST Framework backend and a cross-platform Flutter client (supporting Mobile and Web). Users upload private documents (`.pdf`, `.txt`, `.md`), which are asynchronously parsed, chunked, embedded, and indexed into isolated per-user vector collections in ChromaDB. Users query their personal knowledge base through a conversational interface powered by standard RAG or HyDE (Hypothetical Document Embeddings) retrieval.
 
 ---
 
 ## Tech Stack
 
-| Layer | Choice |
+| Layer | Technology |
 |---|---|
 | Backend Web Framework | Django 5.x + Django REST Framework |
-| Authentication | `djangorestframework-simplejwt` + HTTP Basic Auth |
-| Async Task Processing | Celery 5.x with Redis broker & result backend |
-| Relational Storage | PostgreSQL 16 (users, documents, ingestion jobs) |
-| Vector Database | Chroma vector store, isolated collections (`user_{user_id}`) |
-| RAG Framework | LangChain (`RecursiveCharacterTextSplitter`, document loaders) |
-| Embeddings | Local HuggingFace `all-MiniLM-L6-v2` (384 dims, offline, free) |
-| LLM Gateway | OpenRouter (`https://openrouter.ai/api/v1`) with free-tier models |
-| API Documentation | OpenAPI 3.0.3 + Swagger UI at `/api/docs/` |
-| Mobile Framework | Flutter 3.x / Dart 3.x (iOS & Android) |
-| Mobile Architecture | Clean Architecture with BLoC State Management |
-| Mobile Secure Storage | `flutter_secure_storage` (iOS Keychain, Android Keystore) |
-| Mobile Local Database | SQLite (`sqflite`) / Hive for local multi-thread persistence |
+| Authentication | `djangorestframework-simplejwt` (JWT Token Auth) |
+| Asynchronous Processing | Celery 5.x with Redis 7 Broker & Result Backend |
+| Relational Storage | PostgreSQL 16 (`users`, `documents`, `ingestion_jobs`) |
+| Vector Database | ChromaDB with isolated per-user collections (`user_{id}`) |
+| RAG Pipeline | LangChain (`RecursiveCharacterTextSplitter`, document loaders) |
+| Embedding Model | HuggingFace `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions) |
+| LLM Gateway | OpenRouter / OpenAI-compatible API (`openai/gpt-oss-120b`) |
+| API Documentation | OpenAPI 3.0.3 via DRF Spectacular at `/api/docs/` |
+| Client Application | Flutter 3.x / Dart 3.x (Chrome Web, iOS, Android) |
+| Client Architecture | Clean Architecture with BLoC State Management |
+| Client Storage & Networking | `dio`, `flutter_secure_storage`, `get_it` |
 | Containerization | Docker & Docker Compose |
 
 ---
 
-## Per-User Isolation Guarantee
+## Prerequisites
 
-Per-user isolation is enforced at every tier of the system:
+Ensure the following tools are installed on your system:
 
-- **Vector Collections:** Every user gets a dedicated Chroma collection `user_{user_id}`. Ingestion and retrieval queries strictly operate on the caller's collection.
-- **Relational Ownership:** Documents and ingestion tasks are scoped by foreign keys to the authenticated user.
-- **Access Control:** Accessing or querying resources belonging to another user returns **HTTP 404** (never 403) to prevent resource existence disclosure.
-- **Error Consistency:** All API error responses follow the standardized envelope `{ "error": "<message>" }`.
-
----
-
-## System Architecture
-
-```
-   ┌─────────────────────────────────────────────────────────┐
-   │                  Flutter Mobile Client                  │
-   │  - Auth & Secure Storage   - Doc Management Screen      │
-   │  - Chat Bubbles + Status   - Local Multi-Thread Cache   │
-   │  - HyDE Mode Toggle        - Offline Reading            │
-   └────────────────────────────┬────────────────────────────┘
-                                │ HTTP / JSON (JWT or Basic Auth)
-                                ▼
-   ┌─────────────────────────────────────────────────────────┐
-   │                Django + DRF (Port 8000)                 │
-   │  /api/register/            /api/login/                  │
-   │  /api/auth/me/             /api/documents/upload/       │
-   │  /api/documents/           /api/documents/<id>/         │
-   │  /api/documents/status/    /api/chat/query/ (RAG/HyDE)  │
-   │  /api/schema/              /api/docs/ (Swagger UI)      │
-   └──────────────┬──────────────────┬──────────────────────┘
-                  │                  │
-      enqueue     │    read/write    │   OpenAI-compatible
-      Celery task │    PostgreSQL    │   chat/completions
-                  ▼                  ▼
-         ┌──────────────┐    ┌──────────────────┐
-         │ Redis broker │    │   OpenRouter LLM │
-         └──────┬───────┘    │   (Free tier)    │
-                ▼            └──────────────────┘
-         ┌──────────────────────────────────────┐
-         │  Celery Worker                       │
-         │  extract → chunk → embed → upsert    │
-         └──────────────┬───────────────────────┘
-                        │ user_{user_id} collection
-                        ▼
-                 ┌──────────────┐
-                 │ Chroma DB    │ ← HuggingFace all-MiniLM-L6-v2
-                 └──────────────┘
-```
+- **Docker Engine & Docker Compose** (v2.0+) — [Install Docker](https://docs.docker.com/get-docker/)
+- **Flutter SDK** (v3.10.0+ with Dart SDK 3.x) — [Install Flutter](https://docs.flutter.dev/get-started/install)
+- **Google Chrome** — Required for running the Flutter client on web (`flutter run -d chrome`)
+- **OpenRouter / OpenAI API Key** — Access key for LLM inference (e.g. `openai/gpt-oss-120b`)
 
 ---
 
-## Quickstart (Reviewer Path)
+## Environment Variables
 
-### 1. Boot Backend with Docker Compose
-
-**Prerequisites:** Docker + Docker Compose, an [OpenRouter](https://openrouter.ai/) free API key.
+Copy the example environment file into `.env` at the root of the project:
 
 ```bash
-# 1. Copy environment template and fill in your OpenRouter API key
 cp .env.example .env
-# Edit .env: set OPENROUTER_API_KEY=sk-or-v1-...
-
-# 2. Build and launch all backend services
-docker compose up --build
-
-# 3. Verify health
-curl http://localhost:8000/api/docs/
 ```
 
-| Service | URL |
-|---|---|
-| Django API | `http://localhost:8000` |
-| Swagger UI | `http://localhost:8000/api/docs/` |
-| OpenAPI Schema | `http://localhost:8000/api/schema/` |
-| Chroma Vector Store | `http://localhost:8001` |
+Configure your LLM gateway and application settings in `.env`:
+
+```ini
+# Django Settings
+DJANGO_SECRET_KEY=dev-secret-key-change-in-production-1234567890
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,web
+
+# PostgreSQL Configuration
+POSTGRES_DB=ravid
+POSTGRES_USER=ravid
+POSTGRES_PASSWORD=ravid
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+
+# Redis & Celery
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+# ChromaDB
+CHROMA_HOST=chroma
+CHROMA_PORT=8000
+
+# LLM Gateway Configuration
+# Supports OpenRouter or standard OpenAI-compatible endpoints
+OPENROUTER_API_KEY=your_api_key_here
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=openai/gpt-oss-120b
+
+# Alternative OpenAI environment variables (automatically mapped if set)
+# OPENAI_API_KEY=your_api_key_here
+# OPENAI_API_BASE=https://openrouter.ai/api/v1
+# LLM_MODEL_NAME=openai/gpt-oss-120b
+```
 
 ---
 
-### 2. Run Flutter Mobile Client
+## Backend Setup
+
+### 1. Build and Start Services with Docker Compose
+
+Launch the PostgreSQL, Redis, ChromaDB, Django API, and Celery worker services:
+
+```bash
+docker compose up --build -d
+```
+
+Check running container status:
+
+```bash
+docker compose ps
+```
+
+View live logs:
+
+```bash
+docker compose logs -f web celery
+```
+
+### 2. Run Database Migrations
+
+Database migrations execute automatically on container startup. To run or verify migrations manually:
+
+```bash
+docker compose exec web python manage.py migrate
+```
+
+### 3. Create a Test Superuser
+
+Create an administrative account to authenticate with the API and access the system:
+
+```bash
+docker compose exec -it web python manage.py createsuperuser
+```
+
+### 4. Verify API Availability
+
+Once running, verify the backend endpoints:
+
+| Service | Endpoint |
+|---|---|
+| Django API Base | `http://localhost:8000` |
+| Swagger UI Docs | `http://localhost:8000/api/docs/` |
+| OpenAPI Schema | `http://localhost:8000/api/schema/` |
+| Health Check | `http://localhost:8000/api/health/` |
+| ChromaDB REST | `http://localhost:8001` |
+
+---
+
+## Mobile & Web Setup
+
+The Flutter application supports running directly in the browser via Chrome Web as well as connected iOS/Android simulators.
+
+### 1. Install Dependencies
+
+Navigate to the `mobile/` directory and install the required Dart packages:
 
 ```bash
 cd mobile
-
-# Install dependencies
 flutter pub get
-
-# Run on connected device or simulator
-flutter run
 ```
 
----
+### 2. Run the App on Chrome Web
 
-## API Walkthrough
+Start the application on Google Chrome targeting the local backend (`http://127.0.0.1:8000` by default):
 
 ```bash
-BASE=http://localhost:8000
+flutter run -d chrome
+```
 
-# 1. Register a new account
-curl -s -X POST $BASE/api/register/ \
-  -H "Content-Type: application/json" \
-  -d '{"email":"reviewer@example.com","password":"Sup3rSecretPassword!"}'
-# → {"message":"User registered successfully","user_id":1}
+To specify a custom backend host or port at runtime, pass `--dart-define`:
 
-# 2. Login to obtain JWT Token
-TOKEN=$(curl -s -X POST $BASE/api/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"email":"reviewer@example.com","password":"Sup3rSecretPassword!"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+```bash
+flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:8000
+```
 
-# 3. Upload a document (.pdf, .txt, or .md)
-curl -s -X POST $BASE/api/documents/upload/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "file=@/path/to/document.pdf"
-# → {"message":"Document uploaded and ingestion started","document_id":1,"task_id":"<task_uuid>"}
+### 3. Run on Mobile Devices / Simulators
 
-# 4. Poll Ingestion Status
-curl -s "$BASE/api/documents/status/?task_id=<task_uuid>" \
-  -H "Authorization: Bearer $TOKEN"
-# → {"task_id":"<task_uuid>","status":"SUCCESS","message":"Document successfully parsed, embedded, and indexed in vector storage."}
+List available devices:
 
-# 5. Standard RAG Chat Query
-curl -s -X POST $BASE/api/chat/query/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"query":"What are the primary conclusions in the report?"}'
-# → {"answer":"Based on your uploaded documents..."}
+```bash
+flutter devices
+```
 
-# 6. Advanced HyDE Chat Query (Hypothetical Document Embeddings)
-curl -s -X POST $BASE/api/chat/query/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query":"Explain the architectural trade-offs.",
-    "use_hyde": true,
-    "message_histories": [
-      {"role": "user", "content": "Hello!"},
-      {"role": "assistant", "content": "Hello! How can I assist you with your documents?"}
-    ]
-  }'
-# → {"answer":"..."}
+Run on a specific device or emulator:
+
+```bash
+flutter run -d <device_id>
 ```
 
 ---
 
-## Mobile Application Features
+## Testing Guide
 
-1. **Authentication & Session Persistence:** Secure login with validation, auto-login using Keychain/Keystore via `flutter_secure_storage`, and clean logout.
-2. **Document Management:** Native file picker, background upload triggers, and real-time status badges (`PROCESSING`, `SUCCESS`, `FAILURE`).
-3. **Interactive Chat:** Tailored message bubbles (user vs. assistant), status indicators (`Sending`, `Delivered`, `Failed` with tap-to-retry), auto-scroll, and a HyDE toggle switch.
-4. **Local Multi-Thread Persistence (Bonus):** Persistent SQLite/Hive chat threads, sidebar conversation drawer, offline history review, and swipe-to-delete with cascade cleanup.
+### 1. Backend Automated Tests (Pytest)
+
+Run the backend unit, integration, and security test suites inside the Docker container:
+
+```bash
+docker compose run --rm -e DJANGO_SETTINGS_MODULE=config.settings.test web pytest -v
+```
+
+To run with test coverage reporting:
+
+```bash
+docker compose run --rm -e DJANGO_SETTINGS_MODULE=config.settings.test web pytest --cov=apps -v
+```
+
+The test suite covers:
+- JWT authentication (`/api/token/`, `/api/token/refresh/`)
+- Document validation and upload pipeline (`/api/documents/upload/`)
+- Celery ingestion and state transitions (`/api/documents/status/`)
+- Standard RAG and HyDE query processing (`/api/chat/query/`)
+- Per-user ChromaDB collection isolation and multi-tenant access control
+
+### 2. Flutter Unit & Widget Tests
+
+Run the client unit and widget test suite from the `mobile/` directory:
+
+```bash
+cd mobile
+flutter test
+```
+
+### 3. Flutter Integration Tests (E2E)
+
+Run the end-to-end integration tests:
+
+```bash
+cd mobile
+flutter test integration_test/app_test.dart
+```
 
 ---
 
-## Documentation Suite
+## API Quick Reference
 
-Full technical specifications are maintained under `docs/`:
+### 1. Obtain JWT Access Token
+```bash
+curl -s -X POST http://localhost:8000/api/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"<your_username>","password":"<your_password>"}'
+```
 
-- **Requirements Baseline:**
-  - [`docs/00-anchor/brd.md`](docs/00-anchor/brd.md) — Business Requirements Document
-  - [`docs/00-anchor/srs.md`](docs/00-anchor/srs.md) — Software Requirements Specification
-  - [`docs/00-anchor/glossary.md`](docs/00-anchor/glossary.md) — Architectural Glossary & Terminology
-- **Architecture & System Design:**
-  - [`docs/01-architecture/system_context.md`](docs/01-architecture/system_context.md) — System Topology & Component Interactions
-  - [`docs/01-architecture/database.md`](docs/01-architecture/database.md) — Relational & Local Persistence Models
-  - [`docs/01-architecture/docker.md`](docs/01-architecture/docker.md) — Container Topology & Compose Design
-  - [`docs/01-architecture/project_structure.md`](docs/01-architecture/project_structure.md) — Monorepo Directory Organization
-  - [`docs/01-architecture/api_contract.yaml`](docs/01-architecture/api_contract.yaml) — OpenAPI 3.0.3 Contract
-- **Mobile Architecture:**
-  - [`docs/02-mobile/architecture.md`](docs/02-mobile/architecture.md) — Flutter Client Architecture, BLoC State, & Offline Strategy
+### 2. Upload Document (.pdf, .txt, .md)
+```bash
+curl -s -X POST http://localhost:8000/api/documents/upload/ \
+  -H "Authorization: Bearer <access_token>" \
+  -F "file=@sample_policy.txt"
+```
+
+### 3. Poll Ingestion Status
+```bash
+curl -s "http://localhost:8000/api/documents/status/?task_id=<task_id>" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+### 4. Query RAG (Standard / HyDE)
+```bash
+curl -s -X POST http://localhost:8000/api/chat/query/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What are the primary policy terms?",
+    "use_hyde": false,
+    "message_histories": []
+  }'
+```
+
+---
+
+## Project Structure
+
+```
+.
+├── backend/                  # Django REST Framework application
+│   ├── apps/
+│   │   ├── common/           # Exception handlers, middleware, health endpoints
+│   │   ├── documents/        # Document models, file upload, deletion views
+│   │   ├── rag/              # Ingestion worker, text splitters, Chroma vectorstore
+│   │   └── chat/             # Chat endpoints, LLM integration, HyDE query chain
+│   ├── config/               # Django settings, Celery config, root URLs
+│   ├── tests/                # Backend test suite (Pytest)
+│   ├── Dockerfile            # Python 3.11 container definition
+│   └── requirements.txt      # Python dependencies
+├── mobile/                   # Flutter client application
+│   ├── lib/
+│   │   ├── core/             # API client, secure storage, UI themes, widgets
+│   │   └── features/         # Auth, Document Management, Chat (BLoC + Data + UI)
+│   ├── test/                 # Flutter unit & widget tests
+│   ├── integration_test/     # Flutter E2E integration tests
+│   └── pubspec.yaml          # Flutter dependencies
+├── docs/                     # Architectural, database, and specification docs
+├── docker-compose.yml        # Multi-container orchestration
+├── .env.example              # Environment variable template
+└── README.md                 # Project documentation & getting started guide
+```
