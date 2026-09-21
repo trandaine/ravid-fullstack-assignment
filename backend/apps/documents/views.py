@@ -14,7 +14,7 @@ from apps.rag.models import IngestionJob
 from apps.rag.tasks import ingest_document_task
 
 from .models import Document
-from .serializers import DocumentUploadSerializer
+from .serializers import DocumentSerializer, DocumentUploadSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,37 @@ def _first_error_message(errors: dict | list | str) -> str:
         first_val = next(iter(errors.values()))
         return _first_error_message(first_val)
     return "Invalid input."
+
+
+class DocumentListView(APIView):
+    """GET /api/documents/ - list documents owned by authenticated user."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        documents = Document.objects.filter(owner=request.user).order_by("-uploaded_at")
+        serializer = DocumentSerializer(documents, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class DocumentDeleteView(APIView):
+    """DELETE /api/documents/<int:pk>/ - delete document owned by authenticated user."""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request: Request, pk: int) -> Response:
+        try:
+            document = Document.objects.get(pk=pk, owner=request.user)
+        except Document.DoesNotExist:
+            return Response(
+                {"error": "Document not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if document.file:
+            document.file.delete(save=False)
+        document.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DocumentUploadView(APIView):

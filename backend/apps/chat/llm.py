@@ -42,15 +42,31 @@ class StubChatModel(BaseChatModel):
 
 
 def get_llm() -> BaseChatModel:
-    """Return configured ChatOpenAI instance pointed at OpenRouter or StubChatModel."""
+    """Return configured ChatOpenAI instance pointed at OpenAI-compatible endpoint or StubChatModel."""
     if getattr(settings, "RAVID_LLM_STUB", False):
         return StubChatModel()
 
+    import os
     from langchain_openai import ChatOpenAI
 
-    api_key = getattr(settings, "OPENROUTER_API_KEY", "") or "sk-dummy"
-    base_url = getattr(settings, "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-    model_name = getattr(settings, "OPENROUTER_MODEL", "google/gemma-2-9b-it:free")
+    api_key = (
+        os.getenv("OPENAI_API_KEY")
+        or getattr(settings, "OPENROUTER_API_KEY", "")
+        or os.getenv("OPENROUTER_API_KEY", "")
+        or "sk-dummy"
+    )
+    base_url = (
+        os.getenv("OPENAI_API_BASE")
+        or os.getenv("OPENAI_BASE_URL")
+        or getattr(settings, "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        or os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    )
+    model_name = (
+        os.getenv("LLM_MODEL_NAME")
+        or getattr(settings, "OPENROUTER_MODEL", "")
+        or os.getenv("OPENROUTER_MODEL", "")
+        or "openai/gpt-oss-120b"
+    )
     timeout = getattr(settings, "OPENROUTER_TIMEOUT", 30)
 
     return ChatOpenAI(
