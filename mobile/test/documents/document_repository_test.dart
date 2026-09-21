@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:mobile/features/documents/data/document_repository.dart';
-import 'package:mobile/features/documents/data/models/document.dart';
 
 class MockDio extends Mock implements Dio {}
 class MockFile extends Mock implements File {}
