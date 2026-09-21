@@ -42,7 +42,7 @@ The mobile client adheres to Clean Architecture with the BLoC (Business Logic Co
 
 ### 1. Authentication & Session Management (`features/auth`)
 
-- **LoginScreen:** Email and password form with validation (non-empty, valid format, minimum 8 characters).
+- **LoginScreen:** Username and password form with validation (non-empty, valid format, minimum 8 characters).
 - **Secure Persistence:** Tokens are saved in platform-encrypted storage (`flutter_secure_storage` using iOS Keychain and Android Keystore).
 - **Auto-Login:** On application start, `AuthBloc` checks for an existing valid token in secure storage:
   - If present: navigates directly to the Main / Chat Screen.
